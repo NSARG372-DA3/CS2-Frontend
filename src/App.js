@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
 import "./App.css";
 function App() {
   const [steamId, setSteamId] = useState("");
@@ -11,6 +12,10 @@ function App() {
   const [similarPlayers, setSimilarPlayers] = useState(null);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
 
+  // New state for AI feedback feature
+  const [aiFeedback, setAiFeedback] = useState(null);
+  const [loadingFeedback, setLoadingFeedback] = useState(false);
+
   const steamApiBase = "http://localhost:5001";
   const ocrApiBase = "http://localhost:5003";
   const dbApiBase = "http://localhost:5000"; // Added DB API URL
@@ -18,7 +23,7 @@ function App() {
 
   async function fetchCs2(e) {
     e.preventDefault();
-    if (!steamId) return alert("Tik eers jou Steam ID in");
+    if (!steamId) return alert("Type in your Steam ID");
     setLoading(true);
     setSteamResult(null);
     setSimilarPlayers(null); // Reset on new search
@@ -60,6 +65,53 @@ function App() {
       setSimilarPlayers({ error: err.message });
     } finally {
       setLoadingSimilar(false);
+    }
+  }
+
+  // New function to get AI feedback
+  async function getAIFeedback() {
+    if (!steamResult || steamResult.error) {
+      alert("Please load player stats first");
+      return;
+    }
+
+    setLoadingFeedback(true);
+    setAiFeedback(null);
+
+    try {
+      // Extract relevant stats from steamResult
+      const playerStats = {
+        player: steamId,
+        Kills: getStat("total_kills") || 0,
+        Deaths: getStat("total_deaths") || 0,
+        Assists: getStat("total_assists") || 0,
+        HeadshotPerc:
+          getStat("total_kills_headshot") && getStat("total_kills")
+            ? (
+                (getStat("total_kills_headshot") / getStat("total_kills")) *
+                100
+              ).toFixed(1)
+            : 0,
+        DMG: getStat("total_damage_done") || 0,
+      };
+
+      const res = await fetch(`${feedbackAPIBase}/get_feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ player_stats: playerStats }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "unknown" }));
+        throw new Error(err.error || res.statusText);
+      }
+
+      const data = await res.json();
+      setAiFeedback(data);
+    } catch (err) {
+      setAiFeedback({ error: err.message });
+    } finally {
+      setLoadingFeedback(false);
     }
   }
   async function uploadImage(e) {
@@ -137,14 +189,14 @@ function App() {
     if (similarPlayers.length === 0) {
       return (
         <div style={{ marginTop: 12 }}>
-          Geen soortgelyke spelers in die databasis gevind nie.
+          No similar players found in the database.
         </div>
       );
     }
 
     return (
       <div style={{ marginTop: 16 }}>
-        <h4>👥 Soortgelyke Spelers:</h4>
+        <h4>👥 Similar Players:</h4>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr
@@ -185,6 +237,145 @@ function App() {
             ))}
           </tbody>
         </table>
+      </div>
+    );
+  }
+
+  // New component to render AI feedback
+  function renderAIFeedback() {
+    if (loadingFeedback)
+      return <div style={{ marginTop: 12 }}>Generating AI feedback...</div>;
+    if (!aiFeedback) return null;
+    if (aiFeedback.error) {
+      return (
+        <div style={{ color: "red", marginTop: 12 }}>
+          Error: {aiFeedback.error}
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ marginTop: 16 }}>
+        <h4>🤖 AI Performance Analysis:</h4>
+        <div
+          style={{
+            backgroundColor: "rgba(94, 129, 244, 0.15)",
+            padding: "16px",
+            borderRadius: "8px",
+            border: "1px solid #e9ecef",
+            lineHeight: "1.6",
+          }}
+        >
+          <ReactMarkdown
+            components={{
+              // Custom styling for different markdown elements
+              h1: ({ children }) => (
+                <h1
+                  style={{
+                    fontSize: "1.5em",
+                    margin: "0 0 12px 0",
+                    color: "#ffffffff",
+                  }}
+                >
+                  {children}
+                </h1>
+              ),
+              h2: ({ children }) => (
+                <h2
+                  style={{
+                    fontSize: "1.3em",
+                    margin: "0 0 10px 0",
+                    color: "#a7c7e8ff",
+                  }}
+                >
+                  {children}
+                </h2>
+              ),
+              h3: ({ children }) => (
+                <h3
+                  style={{
+                    fontSize: "1.1em",
+                    margin: "0 0 8px 0",
+                    color: "#66a9ecff",
+                  }}
+                >
+                  {children}
+                </h3>
+              ),
+              p: ({ children }) => (
+                <p style={{ margin: "0 0 12px 0", color: "#ffffffff" }}>
+                  {children}
+                </p>
+              ),
+              ul: ({ children }) => (
+                <ul
+                  style={{
+                    margin: "0 0 12px 0",
+                    paddingLeft: "20px",
+                    color: "#ffffffff",
+                  }}
+                >
+                  {children}
+                </ul>
+              ),
+              ol: ({ children }) => (
+                <ol
+                  style={{
+                    margin: "0 0 12px 0",
+                    paddingLeft: "20px",
+                    color: "#fbfbfbff",
+                  }}
+                >
+                  {children}
+                </ol>
+              ),
+              li: ({ children }) => (
+                <li style={{ margin: "4px 0", lineHeight: "1.5" }}>
+                  {children}
+                </li>
+              ),
+              strong: ({ children }) => (
+                <strong style={{ color: "#00e1ffff", fontWeight: "bold" }}>
+                  {children}
+                </strong>
+              ),
+              em: ({ children }) => (
+                <em style={{ color: "#8e44ad", fontStyle: "italic" }}>
+                  {children}
+                </em>
+              ),
+              code: ({ children }) => (
+                <code
+                  style={{
+                    backgroundColor: "#f8f9fa",
+                    padding: "2px 4px",
+                    borderRadius: "3px",
+                    fontFamily: "monospace",
+                    fontSize: "0.9em",
+                    color: "#ffffffff",
+                  }}
+                >
+                  {children}
+                </code>
+              ),
+              blockquote: ({ children }) => (
+                <blockquote
+                  style={{
+                    borderLeft: "4px solid #3498db",
+                    margin: "12px 0",
+                    paddingLeft: "16px",
+                    fontStyle: "italic",
+                    color: "#ffffffff",
+                  }}
+                >
+                  {children}
+                </blockquote>
+              ),
+            }}
+          >
+            {aiFeedback.feedback}
+          </ReactMarkdown>
+        </div>
       </div>
     );
   }
@@ -387,6 +578,22 @@ function App() {
                 {loadingSimilar ? "Searching..." : "Find similar players"}
               </button>
               {renderSimilarPlayers()}
+            </div>
+          )}
+
+          {steamResult && !steamResult.error && (
+            <div style={{ marginTop: 12 }}>
+              <button
+                onClick={getAIFeedback}
+                disabled={loadingFeedback}
+                className="btn"
+                style={{ backgroundColor: "#28a745", marginTop: "8px" }}
+              >
+                {loadingFeedback
+                  ? "Analyzing..."
+                  : "Get AI Performance Analysis"}
+              </button>
+              {renderAIFeedback()}
             </div>
           )}
         </section>
