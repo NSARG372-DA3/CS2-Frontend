@@ -14,6 +14,7 @@ function App() {
   const steamApiBase = "http://localhost:5001";
   const ocrApiBase = "http://localhost:5003";
   const dbApiBase = "http://localhost:5000"; // Added DB API URL
+  const feedbackAPIBase = "http://localhost:5005";
 
   async function fetchCs2(e) {
     e.preventDefault();
