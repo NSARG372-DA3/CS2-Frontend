@@ -84,7 +84,14 @@ function App() {
         player: steamId,
         Kills: getStat("total_kills") || 0,
         Deaths: getStat("total_deaths") || 0,
-        Assists: getStat("total_assists") || 0,
+        WinPerc:
+          getStat("total_matches_won") && getStat("total_matches_played")
+            ? (
+                (getStat("total_matches_won") /
+                  getStat("total_matches_played")) *
+                100
+              ).toFixed(1)
+            : 0,
         HeadshotPerc:
           getStat("total_kills_headshot") && getStat("total_kills")
             ? (
@@ -114,31 +121,31 @@ function App() {
       setLoadingFeedback(false);
     }
   }
-  async function uploadImage(e) {
-    e.preventDefault();
-    if (!imageFile) return alert("Kies eers 'n image");
-    setLoading(true);
-    setOcrResult(null);
-    try {
-      const base64 = await toBase64(imageFile);
-      console.log(base64);
-      const res = await fetch(`${ocrApiBase}/extract_table`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_base64: base64 }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "unknown" }));
-        throw new Error(err.error || res.statusText);
-      }
-      const data = await res.json();
-      setOcrResult(data);
-    } catch (err) {
-      setOcrResult({ error: err.message });
-    } finally {
-      setLoading(false);
-    }
-  }
+  // async function uploadImage(e) {
+  //   e.preventDefault();
+  //   if (!imageFile) return alert("Kies eers 'n image");
+  //   setLoading(true);
+  //   setOcrResult(null);
+  //   try {
+  //     const base64 = await toBase64(imageFile);
+  //     console.log(base64);
+  //     const res = await fetch(`${ocrApiBase}/extract_table`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ image_base64: base64 }),
+  //     });
+  //     if (!res.ok) {
+  //       const err = await res.json().catch(() => ({ error: "unknown" }));
+  //       throw new Error(err.error || res.statusText);
+  //     }
+  //     const data = await res.json();
+  //     setOcrResult(data);
+  //   } catch (err) {
+  //     setOcrResult({ error: err.message });
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }
 
   // function toBase64(file) {
   //   return new Promise((resolve, reject) => {
@@ -148,24 +155,24 @@ function App() {
   //     reader.onerror = (error) => reject(error);
   //   });
   // }
-  function toBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+  // function toBase64(file) {
+  //   return new Promise((resolve, reject) => {
+  //     const reader = new FileReader();
 
-      reader.onload = () => {
-        // Strip off the prefix if you only want the raw Base64
-        const base64String = reader.result.replace(
-          /^data:image\/[a-zA-Z]+;base64,/,
-          ""
-        );
-        resolve(base64String);
-      };
+  //     reader.onload = () => {
+  //       // Strip off the prefix if you only want the raw Base64
+  //       const base64String = reader.result.replace(
+  //         /^data:image\/[a-zA-Z]+;base64,/,
+  //         ""
+  //       );
+  //       resolve(base64String);
+  //     };
 
-      reader.onerror = (error) => reject(error);
+  //     reader.onerror = (error) => reject(error);
 
-      reader.readAsDataURL(file); // reads the file and triggers onload
-    });
-  }
+  //     reader.readAsDataURL(file); // reads the file and triggers onload
+  //   });
+  // }
 
   // Helper om 'n stat maklik te kry
   function getStat(name) {
@@ -335,7 +342,7 @@ function App() {
                 </li>
               ),
               strong: ({ children }) => (
-                <strong style={{ color: "#5c7aff", fontWeight: "bold" }}>
+                <strong style={{ color: "#6e8efb", fontWeight: "bold" }}>
                   {children}
                 </strong>
               ),
@@ -379,53 +386,77 @@ function App() {
       </div>
     );
   }
+  // Expand favorite gun detection
   function getFavoriteGun() {
     if (!steamResult) return null;
 
-    // map keys => label (match your stat names)
-    const guns = [
-      {
-        key: "total_hits_deagle",
-        label: "Deagle",
-        hits: getStat("total_hits_deagle") || 0,
-      },
-      {
-        key: "total_hits_glock",
-        label: "Glock",
-        hits: getStat("total_hits_glock") || 0,
-      },
-      {
-        key: "total_hits_awp",
-        label: "AWP",
-        hits: getStat("total_hits_awp") || 0,
-      },
-      {
-        key: "total_hits_ak47",
-        label: "AK-47",
-        hits: getStat("total_hits_ak47") || 0,
-      },
-      {
-        key: "total_hits_m4a1",
-        label: "M4A1",
-        hits: getStat("total_hits_m4a1") || 0,
-      },
-      {
-        key: "total_hits_hkp2000",
-        label: "P2000/HKP2000",
-        hits: getStat("total_hits_hkp2000") || 0,
-      },
+    const gunKeys = [
+      { key: "total_hits_ak47", label: "AK-47" },
+      { key: "total_hits_m4a1", label: "M4A1" },
+      { key: "total_hits_awp", label: "AWP" },
+      { key: "total_hits_deagle", label: "Deagle" },
+      { key: "total_hits_glock", label: "Glock" },
+      { key: "total_hits_hkp2000", label: "P2000/HKP2000" },
+      { key: "total_hits_p90", label: "P90" },
+      { key: "total_hits_mac10", label: "MAC-10" },
+      { key: "total_hits_mp7", label: "MP7" },
+      { key: "total_hits_mp9", label: "MP9" },
+      { key: "total_hits_negev", label: "Negev" },
+      { key: "total_hits_bizon", label: "PP-Bizon" },
+      { key: "total_hits_scar20", label: "SCAR-20" },
+      { key: "total_hits_ssg08", label: "SSG 08" },
+      { key: "total_hits_nova", label: "Nova" },
+      { key: "total_hits_mag7", label: "MAG-7" },
+      { key: "total_hits_xm1014", label: "XM1014" },
+      { key: "total_hits_m249", label: "M249" },
+      { key: "total_hits_galilar", label: "Galil AR" },
+      { key: "total_hits_aug", label: "AUG" },
+      { key: "total_hits_famas", label: "FAMAS" },
+      { key: "total_hits_sg556", label: "SG 556" },
+      { key: "total_hits_ump45", label: "UMP-45" },
+      { key: "total_hits_sawedoff", label: "Sawed-Off" },
     ];
 
-    // find max
-    let max = guns[0];
-    for (const g of guns) {
-      if ((g.hits || 0) > (max.hits || 0)) max = g;
-    }
+    const guns = gunKeys.map((g) => ({
+      ...g,
+      hits: getStat(g.key) || 0,
+    }));
 
-    // if all zero, return null
-    if (!max || (max.hits || 0) === 0) return null;
+    let max = guns.reduce((a, b) => (b.hits > a.hits ? b : a), guns[0]);
+    if (!max || max.hits === 0) return null;
+
     return { key: max.key, label: max.label, hits: max.hits };
   }
+
+  // Favorite map detection
+  function getFavoriteMap() {
+    if (!steamResult) return null;
+
+    const mapKeys = [
+      { key: "total_wins_map_de_dust2", label: "Dust II" },
+      { key: "total_wins_map_de_inferno", label: "Inferno" },
+      { key: "total_wins_map_de_nuke", label: "Nuke" },
+      { key: "total_wins_map_de_train", label: "Train" },
+      { key: "total_wins_map_de_cbble", label: "Cobblestone" },
+      { key: "total_wins_map_cs_office", label: "Office" },
+      { key: "total_wins_map_cs_italy", label: "Italy" },
+      { key: "total_wins_map_cs_assault", label: "Assault" },
+      { key: "total_wins_map_de_vertigo", label: "Vertigo" },
+      { key: "total_wins_map_de_lake", label: "Lake" },
+      { key: "total_wins_map_cs_militia", label: "Militia" },
+    ];
+
+    const maps = mapKeys.map((m) => ({
+      ...m,
+      wins: getStat(m.key) || 0,
+    }));
+
+    let max = maps.reduce((a, b) => (b.wins > a.wins ? b : a), maps[0]);
+    if (!max || max.wins === 0) return null;
+
+    return { key: max.key, label: max.label, wins: max.wins };
+  }
+
   function renderPatterns() {
     if (!steamResult || steamResult.error) return null;
 
@@ -438,14 +469,7 @@ function App() {
     const deaths = getStat("total_deaths");
 
     const shots = getStat("total_shots_fired");
-    const hitsDeagle = getStat("total_hits_deagle") || 0;
-    const hitsGlock = getStat("total_hits_glock") || 0;
-    const hitsAwp = getStat("total_hits_awp") || 0;
-    const hitsAk = getStat("total_hits_ak47") || 0;
-    const hitsM4 = getStat("total_hits_m4a1") || 0;
-    const hits2000 = getStat("total_hits_hkp2000") || 0;
-    const totalHits =
-      hitsDeagle + hitsGlock + hitsAwp + hitsAk + hitsM4 + hits2000;
+    const hits = getStat("total_shots_hit") || 0;
 
     const headshots = getStat("total_kills_headshot");
 
@@ -455,24 +479,26 @@ function App() {
     const contrib = getStat("total_contribution_score");
     const mvps = getStat("total_mvps");
 
-    const dust2Wins = getStat("total_wins_map_de_dust2");
-    const infernoWins = getStat("total_wins_map_de_inferno");
+    const doms = getStat("total_dominations") || 0;
+    const revenges = getStat("total_revenges") || 0;
 
     // --- Computed metrics
     const winLossRatio =
       wins !== null && losses > 0 ? (wins / losses).toFixed(2) : null;
     const kdRatio =
       kills !== null && deaths > 0 ? (kills / deaths).toFixed(2) : null;
-    const accuracy = shots > 0 ? ((totalHits / shots) * 100).toFixed(1) : null;
+    const accuracy = shots > 0 ? ((hits / shots) * 100).toFixed(1) : null;
     const hsPercent = kills > 0 ? ((headshots / kills) * 100).toFixed(1) : null;
     const dmgPerRound = rounds > 0 ? (damage / rounds).toFixed(1) : null;
     const contribPerRound = rounds > 0 ? (contrib / rounds).toFixed(1) : null;
     const mvpsPerMatch = played > 0 ? (mvps / played).toFixed(1) : null;
-    const favorite = getFavoriteGun();
+
+    const favoriteGun = getFavoriteGun();
+    const favoriteMap = getFavoriteMap();
+
     return (
       <div style={{ marginTop: 12 }}>
         <h4>📊 Patterns in your gameplay</h4>
-
         <ul>
           {wins !== null && played !== null && (
             <li>
@@ -493,8 +519,7 @@ function App() {
           )}
           {accuracy && (
             <li>
-              Accuracy: <b>{accuracy}%</b> ({totalHits} hits out of {shots}{" "}
-              shots)
+              Accuracy: <b>{accuracy}%</b> ({hits} hits out of {shots} shots)
             </li>
           )}
           {hsPercent && (
@@ -507,9 +532,14 @@ function App() {
               Average damage per round: <b>{dmgPerRound}</b>
             </li>
           )}
-          {favorite && (
+          {favoriteGun && (
             <li>
-              Favorite gun: <b>{favorite.label}</b> ({favorite.hits} hits)
+              Favorite gun: <b>{favoriteGun.label}</b> ({favoriteGun.hits} hits)
+            </li>
+          )}
+          {favoriteMap && (
+            <li>
+              Favorite map: <b>{favoriteMap.label}</b> ({favoriteMap.wins} wins)
             </li>
           )}
           {contribPerRound && (
@@ -522,12 +552,9 @@ function App() {
               MVPs per match: <b>{mvpsPerMatch}</b>
             </li>
           )}
-          {dust2Wins !== null && infernoWins !== null && (
-            <li>
-              Map performance: Dust2 (<b>{dust2Wins}</b> round wins) vs Inferno
-              (<b>{infernoWins}</b> round wins)
-            </li>
-          )}
+          <li>
+            Dominations: <b>{doms}</b>, Revenges: <b>{revenges}</b>
+          </li>
         </ul>
       </div>
     );
