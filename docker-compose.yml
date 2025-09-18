@@ -6,4 +6,4 @@ services:
     container_name: cs2-frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3000:80"
