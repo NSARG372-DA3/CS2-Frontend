@@ -1,20 +1,26 @@
-// src/App.js
 import React, { useState } from "react";
-
+import "./App.css";
 function App() {
   const [steamId, setSteamId] = useState("");
   const [steamResult, setSteamResult] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [ocrResult, setOcrResult] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // New state for similar players feature
+  const [similarPlayers, setSimilarPlayers] = useState(null);
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
+
   const steamApiBase = "http://localhost:5001";
   const ocrApiBase = "http://localhost:5003";
+  const dbApiBase = "http://localhost:5000"; // Added DB API URL
 
   async function fetchCs2(e) {
     e.preventDefault();
     if (!steamId) return alert("Tik eers jou Steam ID in");
     setLoading(true);
     setSteamResult(null);
+    setSimilarPlayers(null); // Reset on new search
     try {
       const res = await fetch(
         `${steamApiBase}/steam/user/${encodeURIComponent(steamId)}/cs2`
@@ -25,6 +31,7 @@ function App() {
       }
       const data = await res.json();
       setSteamResult(data);
+      console.log(data);
     } catch (err) {
       setSteamResult({ error: err.message });
     } finally {
@@ -32,6 +39,28 @@ function App() {
     }
   }
 
+  // New function to find similar players
+  async function findSimilar() {
+    if (!steamId) return;
+    setLoadingSimilar(true);
+    setSimilarPlayers(null);
+    try {
+      const res = await fetch(
+        `${dbApiBase}/similar_players/${encodeURIComponent(steamId)}`
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "unknown" }));
+        throw new Error(err.error || res.statusText);
+      }
+      const data = await res.json();
+      setSimilarPlayers(data.results);
+    } catch (err) {
+      // Use an object to store error message for consistent handling
+      setSimilarPlayers({ error: err.message });
+    } finally {
+      setLoadingSimilar(false);
+    }
+  }
   async function uploadImage(e) {
     e.preventDefault();
     if (!imageFile) return alert("Kies eers 'n image");
@@ -90,6 +119,71 @@ function App() {
     if (!steamResult || !steamResult.stats) return null;
     const stat = steamResult.stats.find((s) => s.name === name);
     return stat ? stat.value : null;
+  }
+
+  // New component to render the list of similar players
+  function renderSimilarPlayers() {
+    if (loadingSimilar)
+      return <div style={{ marginTop: 12 }}>Soek vir spelers...</div>;
+    if (!similarPlayers) return null;
+    if (similarPlayers.error) {
+      return (
+        <div style={{ color: "red", marginTop: 12 }}>
+          Fout: {similarPlayers.error}
+        </div>
+      );
+    }
+    if (similarPlayers.length === 0) {
+      return (
+        <div style={{ marginTop: 12 }}>
+          Geen soortgelyke spelers in die databasis gevind nie.
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ marginTop: 16 }}>
+        <h4>👥 Soortgelyke Spelers:</h4>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr
+              style={{
+                borderBottom: "1px solid #000000ff",
+                background: "#000000ff",
+              }}
+            >
+              <th style={{ textAlign: "left", padding: 8 }}>Naam</th>
+              <th style={{ textAlign: "right", padding: 8 }}>Ure Gespeel</th>
+              <th style={{ textAlign: "right", padding: 8 }}>Matches</th>
+              <th style={{ textAlign: "right", padding: 8 }}>K/D</th>
+            </tr>
+          </thead>
+          <tbody>
+            {similarPlayers.map((player) => (
+              <tr
+                key={player.steam_id}
+                style={{ borderBottom: "1px solid #eee" }}
+              >
+                <td style={{ padding: 8 }}>
+                  {player.username || player.steam_id}
+                </td>
+                <td style={{ textAlign: "right", padding: 8 }}>
+                  {player.total_hours}
+                </td>
+                <td style={{ textAlign: "right", padding: 8 }}>
+                  {player.matches_played ?? "-"}
+                </td>
+                <td style={{ textAlign: "right", padding: 8 }}>
+                  {player.kd_ratio != null
+                    ? Number(player.kd_ratio).toFixed(2)
+                    : "-"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   }
 
   function renderPatterns() {
@@ -195,62 +289,79 @@ function App() {
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 800,
-        margin: "24px auto",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h2>CS2 PoC — Steam en OCR</h2>
+    <div className="container">
+      <div className="header">
+        <div className="brand">
+          <div className="brand-logo" />
+          <div className="brand-title">
+            CS2 Insights — Patterns & Matchmaking
+          </div>
+        </div>
+      </div>
 
-      <section
-        style={{ padding: 12, border: "1px solid #ddd", marginBottom: 16 }}
-      >
-        <h3>1) Steam user stats</h3>
-        <form onSubmit={fetchCs2}>
-          <label>
-            Steam64 ID:
+      <div className="grid">
+        <section className="card">
+          <h3>Steam user stats</h3>
+          <form onSubmit={fetchCs2} className="row">
             <input
+              className="input"
               value={steamId}
               onChange={(e) => setSteamId(e.target.value)}
-              placeholder="12345678901234567"
-              style={{ marginLeft: 8 }}
+              placeholder="Steam64 ID (e.g. 7656119...)"
             />
-          </label>
-          <button type="submit" style={{ marginLeft: 12 }}>
-            Laai CS2 stats
-          </button>
-        </form>
-        {loading && <div>Laai...</div>}
-        {steamResult && !steamResult.error && renderPatterns()}
-        {steamResult?.error && (
-          <pre style={{ background: "#f7f7f7", padding: 12, marginTop: 8 }}>
-            Fout: {steamResult.error}
-          </pre>
-        )}
-      </section>
+            <button type="submit" className="btn">
+              Laai CS2 stats
+            </button>
+          </form>
+          {loading && (
+            <div style={{ marginTop: 8, color: "#a7b3d1" }}>Laai...</div>
+          )}
+          {steamResult && !steamResult.error && renderPatterns()}
+          {steamResult?.error && (
+            <div className="pre" style={{ marginTop: 8 }}>
+              Fout: {steamResult.error}
+            </div>
+          )}
 
-      <section style={{ padding: 12, border: "1px solid #ddd" }}>
-        <h3>2) OCR van image</h3>
-        <form onSubmit={uploadImage}>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setImageFile(e.target.files && e.target.files[0])}
-          />
-          <button type="submit" style={{ marginLeft: 12 }}>
-            Submit
-          </button>
-        </form>
-        <pre style={{ background: "#f7f7f7", padding: 12, marginTop: 8 }}>
-          {ocrResult
-            ? JSON.stringify(ocrResult, null, 2)
-            : "Geen OCR resultate nog"}
-        </pre>
-      </section>
+          {steamId && (
+            <div style={{ marginTop: 12 }}>
+              <button
+                onClick={findSimilar}
+                disabled={loadingSimilar}
+                className="btn"
+              >
+                {loadingSimilar ? "Soek..." : "Vind soortgelyke spelers"}
+              </button>
+              {renderSimilarPlayers()}
+            </div>
+          )}
+        </section>
+
+        {/* <section className="card">
+          <h3>OCR van image</h3>
+          <form onSubmit={uploadImage} className="row">
+            <input
+              className="input"
+              type="file"
+              accept="image/*"
+              onChange={(e) =>
+                setImageFile(e.target.files && e.target.files[0])
+              }
+            />
+            <button type="submit" className="btn btn-secondary">
+              Submit
+            </button>
+          </form>
+          <pre className="pre" style={{ marginTop: 8 }}>
+            {ocrResult
+              ? JSON.stringify(ocrResult, null, 2)
+              : "Geen OCR resultate nog"}
+          </pre>
+        </section> */}
+      </div>
     </div>
   );
 }
 
 export default App;
+//76561198787004874
