@@ -18,7 +18,7 @@ function App() {
 
   async function fetchCs2(e) {
     e.preventDefault();
-    if (!steamId) return alert("Tik eers jou Steam ID in");
+    if (!steamId) return alert("Type in your Steam ID");
     setLoading(true);
     setSteamResult(null);
     setSimilarPlayers(null); // Reset on new search
@@ -137,14 +137,14 @@ function App() {
     if (similarPlayers.length === 0) {
       return (
         <div style={{ marginTop: 12 }}>
-          Geen soortgelyke spelers in die databasis gevind nie.
+          No similar players found in the database.
         </div>
       );
     }
 
     return (
       <div style={{ marginTop: 16 }}>
-        <h4>👥 Soortgelyke Spelers:</h4>
+        <h4>👥 Similar Players:</h4>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr
