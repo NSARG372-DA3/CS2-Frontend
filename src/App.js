@@ -335,7 +335,7 @@ function App() {
                 </li>
               ),
               strong: ({ children }) => (
-                <strong style={{ color: "#00e1ffff", fontWeight: "bold" }}>
+                <strong style={{ color: "#5c7aff", fontWeight: "bold" }}>
                   {children}
                 </strong>
               ),
