@@ -1,27 +1,51 @@
 import React, { useState } from "react";
 import "./App.css";
+
 function App() {
   const [steamId, setSteamId] = useState("");
   const [steamResult, setSteamResult] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [ocrResult, setOcrResult] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  // New state for similar players feature
+  const [aifeedback, setAifeedback] = useState("");
+  const [loadingFeedback, setLoadingFeedback] = useState(false); // New state for feedback loading
   const [similarPlayers, setSimilarPlayers] = useState(null);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
 
   const steamApiBase = "http://localhost:5001";
   const ocrApiBase = "http://localhost:5003";
-  const dbApiBase = "http://localhost:5000"; // Added DB API URL
+  const dbApiBase = "http://localhost:5000";
   const feedbackAPIBase = "http://localhost:5005";
+
+  async function fetchFeedback(playerStats) {
+    setLoadingFeedback(true);
+    setAifeedback(""); // Reset feedback
+    try {
+      const response = await fetch(`${feedbackAPIBase}/get_feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ player_stats: playerStats }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "unknown" }));
+        throw new Error(err.error || response.statusText);
+      }
+      const data = await response.json();
+      setAifeedback(data.feedback || "No feedback received");
+    } catch (err) {
+      setAifeedback(`Error fetching feedback: ${err.message}`);
+    } finally {
+      setLoadingFeedback(false);
+    }
+  }
 
   async function fetchCs2(e) {
     e.preventDefault();
     if (!steamId) return alert("Type in your Steam ID");
     setLoading(true);
     setSteamResult(null);
-    setSimilarPlayers(null); // Reset on new search
+    setSimilarPlayers(null);
+    setAifeedback(""); // Reset feedback on new search
     try {
       const res = await fetch(
         `${steamApiBase}/steam/user/${encodeURIComponent(steamId)}/cs2`
@@ -32,15 +56,29 @@ function App() {
       }
       const data = await res.json();
       setSteamResult(data);
-      console.log(data);
+
+      // Prepare player stats for feedback API
+      const playerStats = {
+        player: steamId, // Or fetch username if available
+        Kills: getStat("total_kills") || 0,
+        Deaths: getStat("total_deaths") || 0,
+        Assists: getStat("total_assists") || 0, // Adjust if assist stat is available
+        HeadshotPerc: getStat("total_kills_headshot") && getStat("total_kills")
+          ? ((getStat("total_kills_headshot") / getStat("total_kills")) * 100).toFixed(1)
+          : 0,
+        DMG: getStat("total_damage_done") || 0,
+      };
+
+      // Fetch AI feedback after getting Steam stats
+      await fetchFeedback(playerStats);
     } catch (err) {
       setSteamResult({ error: err.message });
+      setAifeedback(`Error: ${err.message}`);
     } finally {
       setLoading(false);
     }
   }
 
-  // New function to find similar players
   async function findSimilar() {
     if (!steamId) return;
     setLoadingSimilar(true);
@@ -56,12 +94,12 @@ function App() {
       const data = await res.json();
       setSimilarPlayers(data.results);
     } catch (err) {
-      // Use an object to store error message for consistent handling
       setSimilarPlayers({ error: err.message });
     } finally {
       setLoadingSimilar(false);
     }
   }
+
   async function uploadImage(e) {
     e.preventDefault();
     if (!imageFile) return alert("Kies eers 'n image");
@@ -69,7 +107,6 @@ function App() {
     setOcrResult(null);
     try {
       const base64 = await toBase64(imageFile);
-      console.log(base64);
       const res = await fetch(`${ocrApiBase}/extract_table`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,41 +125,21 @@ function App() {
     }
   }
 
-  // function toBase64(file) {
-  //   return new Promise((resolve, reject) => {
-  //     const reader = new FileReader();
-  //     reader.readAsDataURL(file);
-  //     reader.onload = () => resolve(reader.result.split(",")[1]); // strip prefix
-  //     reader.onerror = (error) => reject(error);
-  //   });
-  // }
   function toBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-
-      reader.onload = () => {
-        // Strip off the prefix if you only want the raw Base64
-        const base64String = reader.result.replace(
-          /^data:image\/[a-zA-Z]+;base64,/,
-          ""
-        );
-        resolve(base64String);
-      };
-
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result.split(",")[1]);
       reader.onerror = (error) => reject(error);
-
-      reader.readAsDataURL(file); // reads the file and triggers onload
     });
   }
 
-  // Helper om 'n stat maklik te kry
   function getStat(name) {
     if (!steamResult || !steamResult.stats) return null;
     const stat = steamResult.stats.find((s) => s.name === name);
     return stat ? stat.value : null;
   }
 
-  // New component to render the list of similar players
   function renderSimilarPlayers() {
     if (loadingSimilar)
       return <div style={{ marginTop: 12 }}>Soek vir spelers...</div>;
@@ -188,64 +205,32 @@ function App() {
       </div>
     );
   }
+
   function getFavoriteGun() {
     if (!steamResult) return null;
-
-    // map keys => label (match your stat names)
     const guns = [
-      {
-        key: "total_hits_deagle",
-        label: "Deagle",
-        hits: getStat("total_hits_deagle") || 0,
-      },
-      {
-        key: "total_hits_glock",
-        label: "Glock",
-        hits: getStat("total_hits_glock") || 0,
-      },
-      {
-        key: "total_hits_awp",
-        label: "AWP",
-        hits: getStat("total_hits_awp") || 0,
-      },
-      {
-        key: "total_hits_ak47",
-        label: "AK-47",
-        hits: getStat("total_hits_ak47") || 0,
-      },
-      {
-        key: "total_hits_m4a1",
-        label: "M4A1",
-        hits: getStat("total_hits_m4a1") || 0,
-      },
-      {
-        key: "total_hits_hkp2000",
-        label: "P2000/HKP2000",
-        hits: getStat("total_hits_hkp2000") || 0,
-      },
+      { key: "total_hits_deagle", label: "Deagle", hits: getStat("total_hits_deagle") || 0 },
+      { key: "total_hits_glock", label: "Glock", hits: getStat("total_hits_glock") || 0 },
+      { key: "total_hits_awp", label: "AWP", hits: getStat("total_hits_awp") || 0 },
+      { key: "total_hits_ak47", label: "AK-47", hits: getStat("total_hits_ak47") || 0 },
+      { key: "total_hits_m4a1", label: "M4A1", hits: getStat("total_hits_m4a1") || 0 },
+      { key: "total_hits_hkp2000", label: "P2000/HKP2000", hits: getStat("total_hits_hkp2000") || 0 },
     ];
-
-    // find max
     let max = guns[0];
     for (const g of guns) {
       if ((g.hits || 0) > (max.hits || 0)) max = g;
     }
-
-    // if all zero, return null
     if (!max || (max.hits || 0) === 0) return null;
     return { key: max.key, label: max.label, hits: max.hits };
   }
+
   function renderPatterns() {
     if (!steamResult || steamResult.error) return null;
-
-    // --- Base stats
     const wins = getStat("total_matches_won");
     const played = getStat("total_matches_played");
     const losses = played && wins !== null ? played - wins : null;
-
     const kills = getStat("total_kills");
     const deaths = getStat("total_deaths");
-
     const shots = getStat("total_shots_fired");
     const hitsDeagle = getStat("total_hits_deagle") || 0;
     const hitsGlock = getStat("total_hits_glock") || 0;
@@ -253,57 +238,42 @@ function App() {
     const hitsAk = getStat("total_hits_ak47") || 0;
     const hitsM4 = getStat("total_hits_m4a1") || 0;
     const hits2000 = getStat("total_hits_hkp2000") || 0;
-    const totalHits =
-      hitsDeagle + hitsGlock + hitsAwp + hitsAk + hitsM4 + hits2000;
-
+    const totalHits = hitsDeagle + hitsGlock + hitsAwp + hitsAk + hitsM4 + hits2000;
     const headshots = getStat("total_kills_headshot");
-
     const damage = getStat("total_damage_done");
     const rounds = getStat("total_rounds_played");
-
     const contrib = getStat("total_contribution_score");
     const mvps = getStat("total_mvps");
-
     const dust2Wins = getStat("total_wins_map_de_dust2");
     const infernoWins = getStat("total_wins_map_de_inferno");
 
-    // --- Computed metrics
-    const winLossRatio =
-      wins !== null && losses > 0 ? (wins / losses).toFixed(2) : null;
-    const kdRatio =
-      kills !== null && deaths > 0 ? (kills / deaths).toFixed(2) : null;
+    const winLossRatio = wins !== null && losses > 0 ? (wins / losses).toFixed(2) : null;
+    const kdRatio = kills !== null && deaths > 0 ? (kills / deaths).toFixed(2) : null;
     const accuracy = shots > 0 ? ((totalHits / shots) * 100).toFixed(1) : null;
     const hsPercent = kills > 0 ? ((headshots / kills) * 100).toFixed(1) : null;
     const dmgPerRound = rounds > 0 ? (damage / rounds).toFixed(1) : null;
     const contribPerRound = rounds > 0 ? (contrib / rounds).toFixed(1) : null;
     const mvpsPerMatch = played > 0 ? (mvps / played).toFixed(1) : null;
     const favorite = getFavoriteGun();
+
     return (
       <div style={{ marginTop: 12 }}>
         <h4>📊 Patterns in your gameplay</h4>
-
         <ul>
           {wins !== null && played !== null && (
             <li>
               Win/Loss — You have won {wins} out of {played} matches.
-              {winLossRatio && (
-                <>
-                  {" "}
-                  (Ratio: <b>{winLossRatio}</b>)
-                </>
-              )}
+              {winLossRatio && <> (Ratio: <b>{winLossRatio}</b>)</>}
             </li>
           )}
           {kdRatio && (
             <li>
-              Kill/Death ratio: <b>{kdRatio}</b> ({kills} kills / {deaths}{" "}
-              deaths)
+              Kill/Death ratio: <b>{kdRatio}</b> ({kills} kills / {deaths} deaths)
             </li>
           )}
           {accuracy && (
             <li>
-              Accuracy: <b>{accuracy}%</b> ({totalHits} hits out of {shots}{" "}
-              shots)
+              Accuracy: <b>{accuracy}%</b> ({totalHits} hits out of {shots} shots)
             </li>
           )}
           {hsPercent && (
@@ -333,11 +303,24 @@ function App() {
           )}
           {dust2Wins !== null && infernoWins !== null && (
             <li>
-              Map performance: Dust2 (<b>{dust2Wins}</b> round wins) vs Inferno
-              (<b>{infernoWins}</b> round wins)
+              Map performance: Dust2 (<b>{dust2Wins}</b> round wins) vs Inferno (<b>{infernoWins}</b> round wins)
             </li>
           )}
         </ul>
+      </div>
+    );
+  }
+
+  // New function to render AI feedback
+  function renderFeedback() {
+    if (loadingFeedback) return <div style={{ marginTop: 12 }}>Loading AI feedback...</div>;
+    if (!aifeedback) return null;
+    return (
+      <div style={{ marginTop: 16 }}>
+        <h4>🧠 AI Feedback</h4>
+        <div style={{ whiteSpace: "pre-wrap", padding: 16, borderRadius: 4 }}>
+          {aifeedback}
+        </div>
       </div>
     );
   }
@@ -371,12 +354,12 @@ function App() {
             <div style={{ marginTop: 8, color: "#a7b3d1" }}>Loading...</div>
           )}
           {steamResult && !steamResult.error && renderPatterns()}
+          {steamResult && !steamResult.error && renderFeedback()} {/* Render AI feedback */}
           {steamResult?.error && (
             <div className="pre" style={{ marginTop: 8 }}>
               Fout: {steamResult.error}
             </div>
           )}
-
           {steamId && (
             <div style={{ marginTop: 12 }}>
               <button
@@ -391,7 +374,7 @@ function App() {
           )}
         </section>
 
-         <section className="card">
+        <section className="card">
           <h3>OCR van image</h3>
           <form onSubmit={uploadImage} className="row">
             <input
@@ -411,11 +394,10 @@ function App() {
               ? JSON.stringify(ocrResult, null, 2)
               : "Geen OCR resultate nog"}
           </pre>
-        </section> 
+        </section>
       </div>
     </div>
   );
 }
 
 export default App;
-//76561198787004874
