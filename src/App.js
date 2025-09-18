@@ -153,8 +153,9 @@ function App() {
                 background: "#000000ff",
               }}
             >
-              <th style={{ textAlign: "left", padding: 8 }}>Naam</th>
-              <th style={{ textAlign: "right", padding: 8 }}>Ure Gespeel</th>
+              <th style={{ textAlign: "left", padding: 8 }}>Steam ID</th>
+              <th style={{ textAlign: "left", padding: 8 }}>UserName</th>
+              <th style={{ textAlign: "right", padding: 8 }}>Hours played</th>
               <th style={{ textAlign: "right", padding: 8 }}>Matches</th>
               <th style={{ textAlign: "right", padding: 8 }}>K/D</th>
             </tr>
@@ -165,6 +166,7 @@ function App() {
                 key={player.steam_id}
                 style={{ borderBottom: "1px solid #eee" }}
               >
+                <td style={{ padding: 8 }}>{player.steam_id}</td>
                 <td style={{ padding: 8 }}>
                   {player.username || player.steam_id}
                 </td>
