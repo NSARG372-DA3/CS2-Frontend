@@ -391,7 +391,7 @@ function App() {
           )}
         </section>
 
-        {/* <section className="card">
+         <section className="card">
           <h3>OCR van image</h3>
           <form onSubmit={uploadImage} className="row">
             <input
@@ -411,7 +411,7 @@ function App() {
               ? JSON.stringify(ocrResult, null, 2)
               : "Geen OCR resultate nog"}
           </pre>
-        </section> */}
+        </section> 
       </div>
     </div>
   );
