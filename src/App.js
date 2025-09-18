@@ -186,7 +186,53 @@ function App() {
       </div>
     );
   }
+  function getFavoriteGun() {
+    if (!steamResult) return null;
 
+    // map keys => label (match your stat names)
+    const guns = [
+      {
+        key: "total_hits_deagle",
+        label: "Deagle",
+        hits: getStat("total_hits_deagle") || 0,
+      },
+      {
+        key: "total_hits_glock",
+        label: "Glock",
+        hits: getStat("total_hits_glock") || 0,
+      },
+      {
+        key: "total_hits_awp",
+        label: "AWP",
+        hits: getStat("total_hits_awp") || 0,
+      },
+      {
+        key: "total_hits_ak47",
+        label: "AK-47",
+        hits: getStat("total_hits_ak47") || 0,
+      },
+      {
+        key: "total_hits_m4a1",
+        label: "M4A1",
+        hits: getStat("total_hits_m4a1") || 0,
+      },
+      {
+        key: "total_hits_hkp2000",
+        label: "P2000/HKP2000",
+        hits: getStat("total_hits_hkp2000") || 0,
+      },
+    ];
+
+    // find max
+    let max = guns[0];
+    for (const g of guns) {
+      if ((g.hits || 0) > (max.hits || 0)) max = g;
+    }
+
+    // if all zero, return null
+    if (!max || (max.hits || 0) === 0) return null;
+    return { key: max.key, label: max.label, hits: max.hits };
+  }
   function renderPatterns() {
     if (!steamResult || steamResult.error) return null;
 
@@ -229,59 +275,64 @@ function App() {
     const dmgPerRound = rounds > 0 ? (damage / rounds).toFixed(1) : null;
     const contribPerRound = rounds > 0 ? (contrib / rounds).toFixed(1) : null;
     const mvpsPerMatch = played > 0 ? (mvps / played).toFixed(1) : null;
-
+    const favorite = getFavoriteGun();
     return (
       <div style={{ marginTop: 12 }}>
-        <h4>📊 Patrone in jou spel</h4>
+        <h4>📊 Patterns in your gameplay</h4>
 
         <ul>
           {wins !== null && played !== null && (
             <li>
-              Wen:Verloor — Jy het {wins} van {played} wedstryde gewen.
+              Win/Loss — You have won {wins} out of {played} matches.
               {winLossRatio && (
                 <>
                   {" "}
-                  (Verhouding: <b>{winLossRatio}</b>)
+                  (Ratio: <b>{winLossRatio}</b>)
                 </>
               )}
             </li>
           )}
           {kdRatio && (
             <li>
-              Kill/Death verhouding: <b>{kdRatio}</b> ({kills} kills / {deaths}{" "}
+              Kill/Death ratio: <b>{kdRatio}</b> ({kills} kills / {deaths}{" "}
               deaths)
             </li>
           )}
           {accuracy && (
             <li>
-              Akkuraatheid: <b>{accuracy}%</b> ({totalHits} treffers uit {shots}{" "}
-              skote)
+              Accuracy: <b>{accuracy}%</b> ({totalHits} hits out of {shots}{" "}
+              shots)
             </li>
           )}
           {hsPercent && (
             <li>
-              Headshot persentasie: <b>{hsPercent}%</b> ({headshots} HS)
+              Headshot percentage: <b>{hsPercent}%</b> ({headshots} HS)
             </li>
           )}
           {dmgPerRound && (
             <li>
-              Gemiddelde skade per rondte: <b>{dmgPerRound}</b>
+              Average damage per round: <b>{dmgPerRound}</b>
+            </li>
+          )}
+          {favorite && (
+            <li>
+              Favorite gun: <b>{favorite.label}</b> ({favorite.hits} hits)
             </li>
           )}
           {contribPerRound && (
             <li>
-              Gemiddelde bydrae per rondte: <b>{contribPerRound}</b>
+              Average contribution per round: <b>{contribPerRound}</b>
             </li>
           )}
           {mvpsPerMatch && (
             <li>
-              MVP’s per wedstryd: <b>{mvpsPerMatch}</b>
+              MVPs per match: <b>{mvpsPerMatch}</b>
             </li>
           )}
           {dust2Wins !== null && infernoWins !== null && (
             <li>
-              Kaart-prestasie: Dust2 (<b>{dust2Wins}</b> rondte wenne) vs
-              Inferno (<b>{infernoWins}</b> rondte wenne)
+              Map performance: Dust2 (<b>{dust2Wins}</b> round wins) vs Inferno
+              (<b>{infernoWins}</b> round wins)
             </li>
           )}
         </ul>
@@ -311,11 +362,11 @@ function App() {
               placeholder="Steam64 ID (e.g. 7656119...)"
             />
             <button type="submit" className="btn">
-              Laai CS2 stats
+              Load Stats
             </button>
           </form>
           {loading && (
-            <div style={{ marginTop: 8, color: "#a7b3d1" }}>Laai...</div>
+            <div style={{ marginTop: 8, color: "#a7b3d1" }}>Loading...</div>
           )}
           {steamResult && !steamResult.error && renderPatterns()}
           {steamResult?.error && (
@@ -331,7 +382,7 @@ function App() {
                 disabled={loadingSimilar}
                 className="btn"
               >
-                {loadingSimilar ? "Soek..." : "Vind soortgelyke spelers"}
+                {loadingSimilar ? "Searching..." : "Find similar players"}
               </button>
               {renderSimilarPlayers()}
             </div>
